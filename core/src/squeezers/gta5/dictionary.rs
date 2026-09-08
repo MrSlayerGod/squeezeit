@@ -118,7 +118,37 @@ fn dictionary_entries(sys: &[u8]) -> impl Iterator<Item = usize> + '_ {
 }
 
 pub(super) fn looks_like_vehicle_dict(records: &[TexRecord]) -> bool {
-    records
-        .iter()
-        .any(|r| r.name.len() >= 15 && r.name[..15].eq_ignore_ascii_case("vehicle_generic"))
+    records.iter().any(|r| {
+        let name = r.name.as_bytes();
+        name.len() >= 15 && name[..15].eq_ignore_ascii_case(b"vehicle_generic")
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn named(name: &str) -> TexRecord {
+        TexRecord {
+            record: 0,
+            name: name.to_string(),
+            width: 4,
+            height: 4,
+            format: 0,
+            levels: 1,
+            data: 0,
+        }
+    }
+
+    #[test]
+    fn a_multi_byte_name_does_not_abort_the_check() {
+        let records = [named("carro_traseir\u{fffd}_spec")];
+        assert!(!looks_like_vehicle_dict(&records));
+    }
+
+    #[test]
+    fn vehicle_generic_is_matched_regardless_of_case() {
+        let records = [named("Vehicle_Generic_SmallSpecMap")];
+        assert!(looks_like_vehicle_dict(&records));
+    }
 }
