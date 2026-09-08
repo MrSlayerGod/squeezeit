@@ -190,7 +190,7 @@ pub(crate) fn squeeze_ytd(
             .with_textures(TextureBytes::unchanged(reserved_before)));
     }
     if !repacked.worth_taking(reserved_before, held_before) {
-        return Ok(SqueezeOutcome::skipped(format!(
+        return Ok(SqueezeOutcome::rejected(format!(
             "rebuilding would reserve {} bytes of graphics memory against the {reserved_before} \
              it already uses, for {} bytes of textures against {held_before}",
             repacked.layout.total_size(),
@@ -222,7 +222,7 @@ pub(crate) fn squeeze_ytd(
 
         Settled::RetryOnCpu => squeeze_ytd(job, settings, None),
         Settled::Loss(reason) => {
-            Ok(SqueezeOutcome::skipped(reason).with_textures(textures.discarded()))
+            Ok(SqueezeOutcome::rejected(reason).with_textures(textures.discarded()))
         }
     }
 }
@@ -414,7 +414,7 @@ pub(crate) fn squeeze_drawable(
                 .with_textures(TextureBytes::unchanged(reserved_before)));
         }
         if !repacked.worth_taking(reserved_before, held_before) {
-            return Ok(SqueezeOutcome::skipped(format!(
+            return Ok(SqueezeOutcome::rejected(format!(
                 "rebuilding would reserve {} bytes of graphics memory against the \
                  {reserved_before} it already uses, for {} bytes of textures against \
                  {held_before}",
@@ -462,7 +462,7 @@ pub(crate) fn squeeze_drawable(
 
         Settled::RetryOnCpu => squeeze_drawable(job, settings, kind, extension, None),
         Settled::Loss(reason) => {
-            Ok(SqueezeOutcome::skipped(reason).with_textures(textures.discarded()))
+            Ok(SqueezeOutcome::rejected(reason).with_textures(textures.discarded()))
         }
     }
 }

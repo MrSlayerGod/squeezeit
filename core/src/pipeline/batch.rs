@@ -3,7 +3,7 @@ use crate::error::{Result, SqueezeError};
 use crate::log::FILE_RESULT;
 use crate::report::SqueezeReport;
 use crate::settings::SqueezeSettings;
-use crate::squeezers::{SqueezeOutcome, SqueezerRegistry, TextureBytes, TextureJob};
+use crate::squeezers::{SkipKind, SqueezeOutcome, SqueezerRegistry, TextureBytes, TextureJob};
 use rayon::prelude::*;
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
@@ -101,10 +101,20 @@ pub fn run_targets(
             Ok(FileResult::Skipped {
                 bytes,
                 reason,
+                kind: SkipKind::NothingToDo,
                 textures,
             }) => {
                 report.record_unchanged(bytes, false, textures);
                 debug!(target: FILE_RESULT, path = %path.display(), reason = %reason, "skipped");
+            }
+            Ok(FileResult::Skipped {
+                bytes,
+                reason,
+                kind: SkipKind::Rejected,
+                textures,
+            }) => {
+                report.record_rejected(bytes, textures);
+                debug!(target: FILE_RESULT, path = %path.display(), reason = %reason, "rejected");
             }
             Err(error) => {
                 report.record_failed();
@@ -162,6 +172,7 @@ enum FileResult {
     Skipped {
         bytes: u64,
         reason: String,
+        kind: SkipKind,
         textures: TextureBytes,
     },
 }
@@ -208,9 +219,14 @@ fn process_one(
             reason,
             textures,
         }),
-        SqueezeOutcome::Skipped { reason, textures } => Ok(FileResult::Skipped {
+        SqueezeOutcome::Skipped {
+            reason,
+            kind,
+            textures,
+        } => Ok(FileResult::Skipped {
             bytes: bytes_before,
             reason,
+            kind,
             textures,
         }),
     }

@@ -515,7 +515,11 @@ fn print_summary(report: &SqueezeReport, dry_run: bool) {
     println!("-- SqueezeIt summary -------------------------");
     println!("  smaller   : {}", s.optimized);
     println!("  protected : {}  (left alone on purpose)", s.locked);
-    println!("  skipped   : {}  (already small enough)", s.skipped);
+    println!("  skipped   : {}  (nothing to do)", s.skipped);
+    println!(
+        "  rejected  : {}  (rebuild refused, run with -v for why)",
+        s.rejected
+    );
     println!("  failed    : {}", s.failed);
     println!(
         "  speed     : {:.1} files/s over {:.1}s",

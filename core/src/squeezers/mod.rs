@@ -74,14 +74,30 @@ pub enum SqueezeOutcome {
     },
     Skipped {
         reason: String,
+        kind: SkipKind,
         textures: TextureBytes,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkipKind {
+    NothingToDo,
+    Rejected,
 }
 
 impl SqueezeOutcome {
     pub fn skipped(reason: impl Into<String>) -> Self {
         Self::Skipped {
             reason: reason.into(),
+            kind: SkipKind::NothingToDo,
+            textures: TextureBytes::ZERO,
+        }
+    }
+
+    pub fn rejected(reason: impl Into<String>) -> Self {
+        Self::Skipped {
+            reason: reason.into(),
+            kind: SkipKind::Rejected,
             textures: TextureBytes::ZERO,
         }
     }
@@ -112,7 +128,11 @@ impl SqueezeOutcome {
                 textures,
             },
             Self::Locked { reason, .. } => Self::Locked { reason, textures },
-            Self::Skipped { reason, .. } => Self::Skipped { reason, textures },
+            Self::Skipped { reason, kind, .. } => Self::Skipped {
+                reason,
+                kind,
+                textures,
+            },
         }
     }
 

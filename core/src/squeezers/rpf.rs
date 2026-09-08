@@ -47,7 +47,7 @@ impl Squeezer for RpfSqueezer {
         }
 
         if rebuilt.len() >= job.bytes.len() {
-            return Ok(SqueezeOutcome::skipped(format!(
+            return Ok(SqueezeOutcome::rejected(format!(
                 "no size win after rebuild ({} in, {} out)",
                 job.bytes.len(),
                 rebuilt.len()

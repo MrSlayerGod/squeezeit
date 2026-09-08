@@ -102,8 +102,8 @@ impl Squeezer for StandardImageSqueezer {
         let converts_format = !extension.eq_ignore_ascii_case(&source_ext);
         let forced = settings.format == FormatMode::ForceDds && converts_format;
         if bytes.len() >= job.bytes.len() && !forced {
-            return Ok(SqueezeOutcome::skipped(format!(
-                "already optimal ({} bytes in, {} bytes out)",
+            return Ok(SqueezeOutcome::rejected(format!(
+                "no size win after rebuild ({} bytes in, {} bytes out)",
                 job.bytes.len(),
                 bytes.len()
             ))

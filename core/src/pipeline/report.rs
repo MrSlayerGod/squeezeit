@@ -18,6 +18,7 @@ pub struct SqueezeReport {
     optimized: AtomicU64,
     locked: AtomicU64,
     skipped: AtomicU64,
+    rejected: AtomicU64,
     failed: AtomicU64,
     bytes_before: AtomicU64,
     bytes_after: AtomicU64,
@@ -48,6 +49,7 @@ impl SqueezeReport {
             &self.optimized,
             &self.locked,
             &self.skipped,
+            &self.rejected,
             &self.failed,
             &self.bytes_before,
             &self.bytes_after,
@@ -83,6 +85,13 @@ impl SqueezeReport {
         self.record_textures(textures);
     }
 
+    pub fn record_rejected(&self, bytes: u64, textures: TextureBytes) {
+        self.rejected.fetch_add(1, Relaxed);
+        self.bytes_before.fetch_add(bytes, Relaxed);
+        self.bytes_after.fetch_add(bytes, Relaxed);
+        self.record_textures(textures);
+    }
+
     fn record_textures(&self, textures: TextureBytes) {
         self.textures_before.fetch_add(textures.before, Relaxed);
         self.textures_after.fetch_add(textures.after, Relaxed);
@@ -98,6 +107,7 @@ impl SqueezeReport {
             optimized: self.optimized.load(Relaxed),
             locked: self.locked.load(Relaxed),
             skipped: self.skipped.load(Relaxed),
+            rejected: self.rejected.load(Relaxed),
             failed: self.failed.load(Relaxed),
             bytes_before: self.bytes_before.load(Relaxed),
             bytes_after: self.bytes_after.load(Relaxed),
@@ -163,6 +173,7 @@ pub struct ReportSnapshot {
     pub optimized: u64,
     pub locked: u64,
     pub skipped: u64,
+    pub rejected: u64,
     pub failed: u64,
     pub bytes_before: u64,
     pub bytes_after: u64,
@@ -175,7 +186,7 @@ pub struct ReportSnapshot {
 
 impl ReportSnapshot {
     pub fn processed(&self) -> u64 {
-        self.optimized + self.locked + self.skipped + self.failed
+        self.optimized + self.locked + self.skipped + self.rejected + self.failed
     }
 
     pub fn worked(&self) -> u64 {
@@ -258,6 +269,20 @@ mod tests {
         assert_eq!(s.textures_after, 870);
         assert_eq!(s.textures_saved(), 750);
         assert!((s.percent_textures_saved() - 46.296).abs() < 0.01);
+    }
+
+    #[test]
+    fn a_refused_rebuild_is_counted_apart_from_a_file_with_nothing_to_do() {
+        let report = SqueezeReport::new();
+        report.begin(2);
+        report.record_unchanged(200, false, TextureBytes::unchanged(500));
+        report.record_rejected(300, TextureBytes::unchanged(9000));
+
+        let s = report.snapshot();
+        assert_eq!(s.skipped, 1);
+        assert_eq!(s.rejected, 1);
+        assert_eq!(s.processed(), 2);
+        assert_eq!(s.textures_saved(), 0);
     }
 
     #[test]

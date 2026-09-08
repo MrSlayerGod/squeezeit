@@ -125,6 +125,7 @@ impl SqueezeItApp {
         statuses.extend(stat("✓", s.optimized, "smaller", GOOD));
         statuses.extend(stat("⊘", s.locked, "protected", AMBER));
         statuses.extend(stat("·", s.skipped, "skipped", DIM));
+        statuses.extend(stat("↩", s.rejected, "rejected", AMBER));
         statuses.extend(stat("✗", s.failed, "failed", RED));
         Paragraph::new(Line::from(statuses)).render(rows[0], buf);
 
