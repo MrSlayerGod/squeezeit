@@ -214,7 +214,7 @@ pub(crate) fn squeeze_ytd(
     )
     .map_err(&rsc7)?;
 
-    match settle(job, out, gpu, textures, repaired > 0) {
+    match settle(job, out, gpu.is_some(), textures, repaired > 0) {
         Settled::Win(bytes) => {
             verify::verify_container(job.path, &bytes, Shape::Dictionary)?;
             Ok(SqueezeOutcome::optimized(bytes, "ytd").with_textures(textures))
@@ -454,7 +454,7 @@ pub(crate) fn squeeze_drawable(
     let out =
         deflate_container(job, version, sys_flags, new_gfx_flags, &sys, &gfx).map_err(&rsc7)?;
 
-    match settle(job, out, gpu, textures, repaired > 0) {
+    match settle(job, out, gpu.is_some(), textures, repaired > 0) {
         Settled::Win(bytes) => {
             verify::verify_container(job.path, &bytes, Shape::Drawable(kind))?;
             Ok(SqueezeOutcome::optimized(bytes, extension).with_textures(textures))
@@ -710,16 +710,19 @@ enum Settled {
 fn settle(
     job: &TextureJob<'_>,
     out: Vec<u8>,
-    gpu: Option<&GpuContext>,
+    gpu_mixed: bool,
     textures: TextureBytes,
     must_write: bool,
 ) -> Settled {
-    if out.len() < job.bytes.len() || textures.saved() > 0 || must_write {
+    if out.len() < job.bytes.len() || must_write {
         return Settled::Win(out);
     }
-    if gpu.is_some() && out.len() < job.bytes.len() + job.bytes.len() / 16 {
+    if gpu_mixed && out.len() < job.bytes.len() + job.bytes.len() / 16 {
         tracing::debug!(path = %job.path.display(), "near break-even with GPU mix, retrying CPU-only");
         return Settled::RetryOnCpu;
+    }
+    if textures.saved() > 0 {
+        return Settled::Win(out);
     }
     Settled::Loss(format!(
         "no graphics memory freed and no size win after rebuild ({} in, {} out)",
@@ -928,8 +931,20 @@ mod tests {
             before: 222 * MIB,
             after: 171 * MIB,
         };
-        let settled = settle(&job_of(&bytes), out, None, textures, false);
+        let settled = settle(&job_of(&bytes), out, false, textures, false);
         assert!(matches!(settled, Settled::Win(_)));
+    }
+
+    #[test]
+    fn a_near_break_even_gpu_rebuild_still_retries_on_cpu_first() {
+        let bytes = vec![0u8; 9_831_982];
+        let out = vec![0u8; 10_000_000];
+        let textures = TextureBytes {
+            before: 222 * MIB,
+            after: 171 * MIB,
+        };
+        let settled = settle(&job_of(&bytes), out, true, textures, false);
+        assert!(matches!(settled, Settled::RetryOnCpu));
     }
 
     #[test]
@@ -937,7 +952,7 @@ mod tests {
         let bytes = vec![0u8; 9_831_982];
         let out = vec![0u8; 10_662_805];
         let textures = TextureBytes::unchanged(222 * MIB);
-        let settled = settle(&job_of(&bytes), out, None, textures, false);
+        let settled = settle(&job_of(&bytes), out, false, textures, false);
         assert!(matches!(settled, Settled::Loss(_)));
     }
 
