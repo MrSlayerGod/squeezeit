@@ -214,7 +214,7 @@ pub(crate) fn squeeze_ytd(
     )
     .map_err(&rsc7)?;
 
-    match settle(job, out, gpu, repaired > 0) {
+    match settle(job, out, gpu, textures, repaired > 0) {
         Settled::Win(bytes) => {
             verify::verify_container(job.path, &bytes, Shape::Dictionary)?;
             Ok(SqueezeOutcome::optimized(bytes, "ytd").with_textures(textures))
@@ -454,7 +454,7 @@ pub(crate) fn squeeze_drawable(
     let out =
         deflate_container(job, version, sys_flags, new_gfx_flags, &sys, &gfx).map_err(&rsc7)?;
 
-    match settle(job, out, gpu, repaired > 0) {
+    match settle(job, out, gpu, textures, repaired > 0) {
         Settled::Win(bytes) => {
             verify::verify_container(job.path, &bytes, Shape::Drawable(kind))?;
             Ok(SqueezeOutcome::optimized(bytes, extension).with_textures(textures))
@@ -711,9 +711,10 @@ fn settle(
     job: &TextureJob<'_>,
     out: Vec<u8>,
     gpu: Option<&GpuContext>,
+    textures: TextureBytes,
     must_write: bool,
 ) -> Settled {
-    if out.len() < job.bytes.len() || must_write {
+    if out.len() < job.bytes.len() || textures.saved() > 0 || must_write {
         return Settled::Win(out);
     }
     if gpu.is_some() && out.len() < job.bytes.len() + job.bytes.len() / 16 {
@@ -721,7 +722,7 @@ fn settle(
         return Settled::RetryOnCpu;
     }
     Settled::Loss(format!(
-        "no size win after rebuild ({} in, {} out)",
+        "no graphics memory freed and no size win after rebuild ({} in, {} out)",
         job.bytes.len(),
         out.len()
     ))
@@ -908,6 +909,36 @@ mod tests {
             duplicates: 0,
             held,
         }
+    }
+
+    fn job_of(bytes: &[u8]) -> TextureJob<'_> {
+        TextureJob {
+            path: Path::new("pack.ytd"),
+            bytes,
+            asset_hint: None,
+            pool_saturated: false,
+        }
+    }
+
+    #[test]
+    fn freeing_graphics_memory_is_enough_to_keep_a_rebuild_that_grew_on_disk() {
+        let bytes = vec![0u8; 9_831_982];
+        let out = vec![0u8; 10_662_805];
+        let textures = TextureBytes {
+            before: 222 * MIB,
+            after: 171 * MIB,
+        };
+        let settled = settle(&job_of(&bytes), out, None, textures, false);
+        assert!(matches!(settled, Settled::Win(_)));
+    }
+
+    #[test]
+    fn a_rebuild_that_frees_nothing_and_grows_on_disk_is_refused() {
+        let bytes = vec![0u8; 9_831_982];
+        let out = vec![0u8; 10_662_805];
+        let textures = TextureBytes::unchanged(222 * MIB);
+        let settled = settle(&job_of(&bytes), out, None, textures, false);
+        assert!(matches!(settled, Settled::Loss(_)));
     }
 
     #[test]
