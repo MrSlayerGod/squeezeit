@@ -416,8 +416,10 @@ pub(crate) fn squeeze_drawable(
         if !repacked.worth_taking(reserved_before, held_before) {
             return Ok(SqueezeOutcome::skipped(format!(
                 "rebuilding would reserve {} bytes of graphics memory against the \
-                 {reserved_before} it already uses",
+                 {reserved_before} it already uses, for {} bytes of textures against \
+                 {held_before}",
                 repacked.layout.total_size(),
+                repacked.held,
             ))
             .with_textures(TextureBytes::unchanged(reserved_before)));
         }
@@ -588,7 +590,7 @@ struct Repacked {
 
 impl Repacked {
     fn worth_taking(&self, reserved_before: u64, held_before: u64) -> bool {
-        self.layout.total_size() <= reserved_before || self.held > held_before
+        self.layout.total_size() <= reserved_before && self.held <= held_before
     }
 }
 
@@ -896,6 +898,37 @@ mod tests {
 
     fn mib(bytes: u64) -> f64 {
         bytes as f64 / MIB as f64
+    }
+
+    fn repacked(held: u64) -> Repacked {
+        let (layout, _) = PageLayout::pack(&[held as usize], DATA_ALIGN).expect("packable");
+        Repacked {
+            gfx: Vec::new(),
+            layout,
+            duplicates: 0,
+            held,
+        }
+    }
+
+    #[test]
+    fn a_rebuild_that_holds_more_textures_is_refused() {
+        let candidate = repacked(8 * MIB);
+        let reserved_before = candidate.layout.total_size();
+        assert!(!candidate.worth_taking(reserved_before, 4 * MIB));
+    }
+
+    #[test]
+    fn a_rebuild_that_reserves_more_memory_is_refused() {
+        let candidate = repacked(8 * MIB);
+        let reserved_before = candidate.layout.total_size() - 1;
+        assert!(!candidate.worth_taking(reserved_before, 16 * MIB));
+    }
+
+    #[test]
+    fn a_rebuild_that_frees_texture_memory_is_taken() {
+        let candidate = repacked(4 * MIB);
+        let reserved_before = candidate.layout.total_size() + 1;
+        assert!(candidate.worth_taking(reserved_before, 8 * MIB));
     }
 
     #[test]
