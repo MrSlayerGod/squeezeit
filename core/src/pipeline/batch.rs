@@ -6,6 +6,7 @@ use crate::settings::SqueezeSettings;
 use crate::squeezers::{SqueezeOutcome, SqueezerRegistry, TextureBytes, TextureJob};
 use rayon::prelude::*;
 use std::fs;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::{debug, error, info, warn};
@@ -69,7 +70,18 @@ pub fn run_targets(
             debug!(target: FILE_RESULT, path = %path.display(), reason = "cancelled", "skipped");
             return;
         }
-        match process_one(path, registry, settings, vault.as_ref(), pool_saturated) {
+        let attempt = panic::catch_unwind(AssertUnwindSafe(|| {
+            process_one(path, registry, settings, vault.as_ref(), pool_saturated)
+        }));
+        let outcome = match attempt {
+            Ok(outcome) => outcome,
+            Err(payload) => {
+                report.record_failed();
+                error!(target: FILE_RESULT, path = %path.display(), error = %panic_message(payload.as_ref()), "panicked");
+                return;
+            }
+        };
+        match outcome {
             Ok(FileResult::Optimized {
                 bytes_before,
                 bytes_after,
@@ -125,6 +137,15 @@ pub fn run_targets(
     }
 
     Ok(())
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
+    if let Some(text) = payload.downcast_ref::<&'static str>() {
+        return text;
+    }
+    payload
+        .downcast_ref::<String>()
+        .map_or("worker panicked", String::as_str)
 }
 
 enum FileResult {
