@@ -125,7 +125,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "crossbeam-queue",
  "humansize",
@@ -520,7 +520,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "cli"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3013,7 +3013,7 @@ dependencies = [
 
 [[package]]
 name = "squeezeit"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "block_compression",
  "cargo-husky",
