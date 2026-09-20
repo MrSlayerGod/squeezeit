@@ -11,6 +11,8 @@ use crate::settings::SqueezeSettings;
 use std::path::Path;
 use std::sync::Arc;
 
+const FXAP_PATTERN: [u8; 4] = *b"FXAP";
+
 #[derive(Debug, Clone, Copy)]
 pub struct TextureJob<'a> {
     pub path: &'a Path,
@@ -186,6 +188,9 @@ impl SqueezerRegistry {
         job: &TextureJob<'_>,
         settings: &SqueezeSettings,
     ) -> Result<SqueezeOutcome> {
+        if job.bytes.starts_with(&FXAP_PATTERN) {
+            return Ok(SqueezeOutcome::skipped("FiveM escrowed file (FXAP)"));
+        }
         let squeezer = self
             .squeezers
             .iter()
